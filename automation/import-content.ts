@@ -69,7 +69,7 @@ async function runImportPipeline() {
     let coverUrl = item.coverUrl;
     let excerpt = translateToPtBr(item.excerpt || '');
     let content = translateToPtBr(item.content || '');
-    let developer = item.sourceGroup;
+    let developer: string = item.sourceGroup;
     let title = formattedTitle;
 
     if (!coverUrl || coverUrl.includes('unsplash')) {
@@ -77,8 +77,8 @@ async function runImportPipeline() {
       if (gameInfo) {
         title = cleanTitle(gameInfo.title || formattedTitle);
         coverUrl = gameInfo.coverUrl || coverUrl;
-        excerpt = excerpt || translateToPtBr(gameInfo.excerpt);
-        content = content || translateToPtBr(gameInfo.content);
+        excerpt = excerpt || translateToPtBr(gameInfo.excerpt || '');
+        content = content || translateToPtBr(gameInfo.content || '');
         developer = gameInfo.developer || item.sourceGroup;
       }
     }
@@ -104,8 +104,9 @@ async function runImportPipeline() {
         .single();
 
       if (!catErr && newCat) {
-        categoryId = newCat.id;
-        categoryMap.set(item.categorySlug, categoryId);
+        const newCatId: string = newCat.id;
+        categoryId = newCatId;
+        categoryMap.set(item.categorySlug, newCatId);
         console.log(`✨ Nova categoria criada automaticamente: "${item.categoryName}" (${item.categorySlug})`);
       }
     }
