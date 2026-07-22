@@ -49,7 +49,7 @@ function generateSlug(title: string): string {
 }
 
 /**
- * Títulos a ignorar por não serem jogos
+ * Títulos a ignorar por não serem lançamentos de jogos
  */
 const IGNORED_TITLE_PATTERNS = [
   /upcoming\s+repacks/i,
@@ -60,9 +60,9 @@ const IGNORED_TITLE_PATTERNS = [
 ];
 
 /**
- * Extrai os itens mais recentes dos feeds RSS oficiais do FitGirl e DODI com capas e descrições completas
+ * Extrai TODOS os lançamentos dos feeds RSS oficiais do FitGirl e DODI com capas e descrições completas
  */
-export async function fetchRssRepacks(limitPerSource: number = 4): Promise<RssRepackItem[]> {
+export async function fetchRssRepacks(limitPerSource: number = 30): Promise<RssRepackItem[]> {
   const items: RssRepackItem[] = [];
 
   const feeds = [
@@ -72,9 +72,9 @@ export async function fetchRssRepacks(limitPerSource: number = 4): Promise<RssRe
 
   for (const feed of feeds) {
     try {
-      console.log(`🌐 Lendo feed RSS oficial de ${feed.group}... (${feed.url})`);
+      console.log(`🌐 Lendo todos os lançamentos do feed RSS oficial de ${feed.group}... (${feed.url})`);
       const response = await axios.get(feed.url, {
-        timeout: 12000,
+        timeout: 15000,
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
           'Accept': 'text/xml, application/xml, application/rss+xml, */*'

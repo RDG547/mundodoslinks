@@ -104,11 +104,11 @@ ${postUrl}
 async function runImportPipeline() {
   console.log('🤖 Iniciando esteira automatizada de jogos e repacks (Hydra, Feeds RSS, Steam & RAWG API)...');
 
-  let itemsToProcess = await fetchHydraRepacks(2);
+  let itemsToProcess = await fetchHydraRepacks(10);
 
   if (itemsToProcess.length === 0) {
-    console.log('🔄 Alternando para ingestão via Feeds RSS Oficiais...');
-    const rssItems: RssRepackItem[] = await fetchRssRepacks(4);
+    console.log('🔄 Alternando para ingestão completa via Feeds RSS Oficiais...');
+    const rssItems: RssRepackItem[] = await fetchRssRepacks(30);
     itemsToProcess = rssItems.map(r => ({
       title: decodeHtmlEntities(r.title),
       slug: r.slug,
@@ -133,21 +133,7 @@ async function runImportPipeline() {
     const cleanTitle = decodeHtmlEntities(item.title);
     console.log(`\n🔍 Processando item: "${cleanTitle}" [${item.sourceGroup}]`);
 
-    // 2. Se o Supabase estiver conectado, checa se o post já existe
-    if (supabase) {
-      const { data: postExistente } = await supabase
-        .from('posts')
-        .select('id')
-        .eq('slug', item.slug)
-        .maybeSingle();
-
-      if (postExistente) {
-        console.log(`[SKIP] O post "${cleanTitle}" já existe no banco de dados.`);
-        continue;
-      }
-    }
-
-    // 3. Busca capas e metadados na Steam API / RAWG API se a capa do RSS não veio definida
+    // 1. Busca capas e metadados na Steam API / RAWG API se a capa do RSS não veio definida
     let coverUrl = item.coverUrl;
     let excerpt = item.excerpt;
     let content = item.content;
@@ -171,49 +157,105 @@ async function runImportPipeline() {
     content = content || `Download verificado de ${cleanTitle} com alta velocidade. Liberado pelo grupo ${item.sourceGroup}.`;
     const downloadUrl = item.uris[0];
 
-    // 4. Encurta o link via Softurl API
+    // 2. Encurta o link via Softurl API
     console.log('🔗 Solicitando link monetizado na API do Softurl...');
     const publicUrl = await encurtarUrl(downloadUrl);
     await sleep(500);
 
-    // 5. Salva no Supabase (se configurado)
+    // 3. Salva ou atualiza no Supabase (se configurado)
     let postId = `local-${Date.now()}`;
     if (supabase) {
-      const { data: novoPost, error: errPost } = await supabase
+      // Checa se o post já existe no banco
+      const { data: postExistente } = await supabase
         .from('posts')
-        .insert({
-          title,
-          slug: item.slug,
-          excerpt,
-          content,
-          cover_url: coverUrl,
-          developer,
-          status: 'published',
-          published_at: new Date().toISOString(),
-        })
         .select('id')
-        .single();
+        .eq('slug', item.slug)
+        .maybeSingle();
 
-      if (errPost || !novoPost) {
-        console.error(`[ERROR] Falha ao inserir post no Supabase:`, errPost?.message || errPost);
-        continue;
-      }
+      if (postExistente) {
+        console.log(`🔄 [UPDATE] Atualizando registro existente no Supabase ID: ${postExistente.id}`);
+        await supabase
+          .from('posts')
+          .update({
+            title,
+            excerpt,
+            content,
+            cover_url: coverUrl,
+            developer,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', postExistente.id);
 
-      postId = novoPost.id;
+        postId = postExistente.id;
 
-      const { error: errLink } = await supabase.from('download_links').insert({
-        post_id: postId,
-        version: item.sourceGroup,
-        original_url: downloadUrl,
-        public_url: publicUrl,
-        shortener_provider: 'softurl',
-        status: 'active',
-      });
+        // Atualiza link de download
+        const { data: linkExistente } = await supabase
+          .from('download_links')
+          .select('id')
+          .eq('post_id', postId)
+          .maybeSingle();
 
-      if (errLink) {
-        console.error(`[ERROR] Falha ao salvar link de download:`, errLink?.message || errLink);
+        if (linkExistente) {
+          await supabase
+            .from('download_links')
+            .update({
+              version: item.sourceGroup,
+              original_url: downloadUrl,
+              public_url: publicUrl,
+            })
+            .eq('id', linkExistente.id);
+        } else {
+          await supabase.from('download_links').insert({
+            post_id: postId,
+            version: item.sourceGroup,
+            original_url: downloadUrl,
+            public_url: publicUrl,
+            shortener_provider: 'softurl',
+            status: 'active',
+          });
+        }
+
+        console.log(`✅ Registro atualizado com sucesso no Supabase.`);
       } else {
-        console.log(`✅ Registro salvo no Supabase com sucesso (ID: ${postId})`);
+        const { data: novoPost, error: errPost } = await supabase
+          .from('posts')
+          .insert({
+            title,
+            slug: item.slug,
+            excerpt,
+            content,
+            cover_url: coverUrl,
+            developer,
+            status: 'published',
+            published_at: new Date().toISOString(),
+          })
+          .select('id')
+          .single();
+
+        if (errPost || !novoPost) {
+          console.error(`[ERROR] Falha ao inserir post no Supabase:`, errPost?.message || errPost);
+          continue;
+        }
+
+        postId = novoPost.id;
+
+        const { error: errLink } = await supabase.from('download_links').insert({
+          post_id: postId,
+          version: item.sourceGroup,
+          original_url: downloadUrl,
+          public_url: publicUrl,
+          shortener_provider: 'softurl',
+          status: 'active',
+        });
+
+        if (errLink) {
+          console.error(`[ERROR] Falha ao salvar link de download:`, errLink?.message || errLink);
+        } else {
+          console.log(`✅ Novo registro inserido no Supabase com sucesso (ID: ${postId})`);
+        }
+
+        // Notifica o Telegram apenas para novos posts inseridos
+        await notificarTelegram(title, item.slug, publicUrl, item.sourceGroup);
       }
     } else {
       console.log(`ℹ️ [DRY RUN] Item processado com sucesso:`);
@@ -221,9 +263,6 @@ async function runImportPipeline() {
       console.log(`   - Capa Captação: ${coverUrl}`);
       console.log(`   - Link: ${publicUrl}`);
     }
-
-    // 6. Notifica o Telegram
-    await notificarTelegram(title, item.slug, publicUrl, item.sourceGroup);
 
     await sleep(1000);
   }
