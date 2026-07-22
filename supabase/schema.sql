@@ -64,13 +64,16 @@ ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE download_links ENABLE ROW LEVEL SECURITY;
 ALTER TABLE telegram_publications ENABLE ROW LEVEL SECURITY;
 
--- Políticas de Acesso Público para leitura
+-- Políticas de Acesso Público para leitura (com remoção preventiva para idempotência)
+DROP POLICY IF EXISTS "Leitura pública de posts publicados" ON posts;
 CREATE POLICY "Leitura pública de posts publicados" ON posts
   FOR SELECT USING (status = 'published');
 
+DROP POLICY IF EXISTS "Leitura pública de categorias" ON categories;
 CREATE POLICY "Leitura pública de categorias" ON categories
   FOR SELECT USING (true);
 
+DROP POLICY IF EXISTS "Leitura pública de links de download ativos" ON download_links;
 CREATE POLICY "Leitura pública de links de download ativos" ON download_links
   FOR SELECT USING (status = 'active');
 
