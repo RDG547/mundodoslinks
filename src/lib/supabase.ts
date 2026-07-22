@@ -19,7 +19,7 @@ export const MOCK_CATEGORIES: Category[] = [
 export const MOCK_POSTS: Post[] = [
   {
     id: 'post-1',
-    title: 'Blender 4.2 LTS - Suite 3D Open Source',
+    title: 'Blender 4.2 LTS',
     slug: 'blender-4-2-lts',
     excerpt: 'Completa suite para criação 3D, animação, renderização, composição e rastreamento de movimento.',
     content: 'O Blender é o programa de criação 3D gratuito e de código aberto. Ele oferece suporte a todas as etapas do pipeline 3D: modelagem, rig, animação, simulação, renderização, composição e rastreamento de movimento, até mesmo edição de vídeo.',
@@ -37,8 +37,8 @@ export const MOCK_POSTS: Post[] = [
         post_id: 'post-1',
         version: 'v4.2.3 LTS',
         original_url: 'https://download.blender.org/release/Blender4.2/blender-4.2.3-windows-x64.msi',
-        public_url: 'https://softurl.co/demo-blender',
-        shortener_provider: 'softurl',
+        public_url: 'https://download.blender.org/release/Blender4.2/blender-4.2.3-windows-x64.msi',
+        shortener_provider: 'direct',
         status: 'active',
         created_at: new Date().toISOString()
       }
@@ -46,7 +46,7 @@ export const MOCK_POSTS: Post[] = [
   },
   {
     id: 'post-2',
-    title: 'OBS Studio 30.2 - Transmissão & Gravação',
+    title: 'OBS Studio 30.2',
     slug: 'obs-studio-30-2',
     excerpt: 'Software gratuito e de código aberto para gravação de vídeo e transmissão ao vivo.',
     content: 'Baixe e comece a transmitir de forma rápida e fácil no Windows, Mac ou Linux. O OBS Studio é equipado com uma poderosa API, permitindo plugins e integrações personalizadas.',
@@ -64,62 +64,8 @@ export const MOCK_POSTS: Post[] = [
         post_id: 'post-2',
         version: 'v30.2.2',
         original_url: 'https://github.com/obsproject/obs-studio/releases/download/30.2.2/OBS-Studio-30.2.2-Full-Installer-x64.exe',
-        public_url: 'https://softurl.co/demo-obs',
-        shortener_provider: 'softurl',
-        status: 'active',
-        created_at: new Date().toISOString()
-      }
-    ]
-  },
-  {
-    id: 'post-3',
-    title: 'Godot Engine 4.3 - Motor de Jogos 2D/3D',
-    slug: 'godot-engine-4-3',
-    excerpt: 'Motor de desenvolvimento de jogos gratuito, leve e open source com suporte a GDScript e C#.',
-    content: 'O Godot fornece um conjunto enorme de ferramentas comuns para que você possa se concentrar apenas em criar seu jogo sem reinventar a roda. O editor roda leve e exporta para PC, mobile e web.',
-    cover_url: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=800&q=80',
-    developer: 'Godot Engine Community',
-    category_id: 'cat-2',
-    category: MOCK_CATEGORIES[1],
-    status: 'published',
-    published_at: new Date().toISOString(),
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    download_links: [
-      {
-        id: 'link-3',
-        post_id: 'post-3',
-        version: 'v4.3 Stable',
-        original_url: 'https://godotengine.org/download/windows/',
-        public_url: 'https://softurl.co/demo-godot',
-        shortener_provider: 'softurl',
-        status: 'active',
-        created_at: new Date().toISOString()
-      }
-    ]
-  },
-  {
-    id: 'post-4',
-    title: 'GIMP 2.10.38 - Editor de Imagens Avançado',
-    slug: 'gimp-2-10-38',
-    excerpt: 'Editor de imagens open source para retoques de fotos, composição e criação gráfica.',
-    content: 'Quer você seja um designer gráfico, fotógrafo, ilustrador ou cientista, o GIMP oferece ferramentas sofisticadas para realizar seu trabalho.',
-    cover_url: 'https://images.unsplash.com/photo-1626785774573-4b799315345d?auto=format&fit=crop&w=800&q=80',
-    developer: 'GIMP Team',
-    category_id: 'cat-3',
-    category: MOCK_CATEGORIES[2],
-    status: 'pending_review',
-    published_at: undefined,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    download_links: [
-      {
-        id: 'link-4',
-        post_id: 'post-4',
-        version: 'v2.10.38',
-        original_url: 'https://download.gimp.org/gimp/v2.10/windows/gimp-2.10.38-setup.exe',
-        public_url: 'https://softurl.co/demo-gimp',
-        shortener_provider: 'softurl',
+        public_url: 'https://github.com/obsproject/obs-studio/releases/download/30.2.2/OBS-Studio-30.2.2-Full-Installer-x64.exe',
+        shortener_provider: 'direct',
         status: 'active',
         created_at: new Date().toISOString()
       }

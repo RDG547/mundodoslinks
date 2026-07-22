@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import fs from 'fs';
 import path from 'path';
 import { fetchRssRepacks, RssRepackItem } from './sources/rss';
-import { fetchGameMetadata, decodeHtmlEntities } from './services/rawg';
+import { fetchGameMetadata } from './services/rawg';
 import { cleanTitle, translateToPtBr } from './services/translator';
 
 // Carrega variáveis do arquivo .env.local se estiver rodando via CLI local sem GitHub Actions
@@ -31,10 +31,10 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || proce
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * Função principal do Pipeline de Importação Massiva com Tradução PT-BR e Links Diretos
+ * Função principal do Pipeline de Importação com Links Diretos, Capas Garantidas e Categorias Atualizadas
  */
 async function runImportPipeline() {
-  console.log('🤖 Iniciando esteira de raspagem com links diretos, títulos limpos e tradução PT-BR...');
+  console.log('🤖 Iniciando esteira de raspagem com links diretos, capas garantidas e categorias estritas...');
 
   const rssItems: RssRepackItem[] = await fetchRssRepacks(100);
 
@@ -76,7 +76,7 @@ async function runImportPipeline() {
       const gameInfo = await fetchGameMetadata(formattedTitle);
       if (gameInfo) {
         title = cleanTitle(gameInfo.title || formattedTitle);
-        coverUrl = gameInfo.coverUrl;
+        coverUrl = gameInfo.coverUrl || coverUrl;
         excerpt = excerpt || translateToPtBr(gameInfo.excerpt);
         content = content || translateToPtBr(gameInfo.content);
         developer = gameInfo.developer || item.sourceGroup;
@@ -87,11 +87,11 @@ async function runImportPipeline() {
     excerpt = excerpt || `Download verificado do aplicativo/jogo ${title} fornecido por ${item.sourceGroup}.`;
     content = content || `Download verificado de ${title} com alta velocidade. Liberado pelo provedor ${item.sourceGroup}.`;
     
-    // 1. DESATIVADO LINK ENCURTADO POR ENQUANTO (Usando link direto/magnet)
+    // Links Diretos sem Encurtador
     const downloadUrl = item.magnetOrUrl;
     const publicUrl = downloadUrl; 
 
-    // Obtém a categoria
+    // Obtém ID da Categoria estrita (Softwares Livres, Jogos Indie, Utilitários, Mídias Autorizadas)
     const categoryId = categoryMap.get(item.categorySlug) || categoryMap.get('softwares-livres') || categoryMap.get('jogos-indie');
 
     // Salva ou Atualiza no Supabase
@@ -104,7 +104,7 @@ async function runImportPipeline() {
         .maybeSingle();
 
       if (postExistente) {
-        console.log(`🔄 [UPDATE] Atualizando registro no Supabase (ID: ${postExistente.id}) com título limpo e PT-BR...`);
+        console.log(`🔄 [UPDATE] Atualizando registro no Supabase (ID: ${postExistente.id})...`);
         await supabase
           .from('posts')
           .update({

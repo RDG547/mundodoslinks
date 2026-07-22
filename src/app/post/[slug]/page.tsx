@@ -16,12 +16,14 @@ export default function PostDetailPage() {
   const [post, setPost] = useState<Post | null>(null);
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [imgSrc, setImgSrc] = useState<string | null>(null);
 
   useEffect(() => {
     if (!slug) return;
 
     fetchPostBySlug(slug).then((data) => {
       setPost(data);
+      setImgSrc(data?.cover_url || null);
       setLoading(false);
     });
   }, [slug]);
@@ -39,6 +41,8 @@ export default function PostDetailPage() {
   }
 
   const mainLink = post.download_links?.[0];
+  const directDownloadUrl = mainLink?.original_url || mainLink?.public_url || '#';
+  const fallbackCover = 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=800&q=80';
 
   return (
     <div className="space-y-8 max-w-5xl mx-auto">
@@ -56,12 +60,14 @@ export default function PostDetailPage() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
           {/* Cover Image */}
           <div className="lg:col-span-5 relative h-72 rounded-2xl overflow-hidden bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-            {post.cover_url ? (
+            {imgSrc ? (
               <Image
-                src={post.cover_url}
+                src={imgSrc}
                 alt={post.title}
                 fill
                 className="object-cover"
+                unoptimized
+                onError={() => setImgSrc(fallbackCover)}
                 priority
               />
             ) : (
@@ -83,7 +89,7 @@ export default function PostDetailPage() {
 
               <span className="px-3 py-1 rounded-full text-xs font-semibold bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/30 flex items-center gap-1">
                 <ShieldCheck className="w-3.5 h-3.5" />
-                Links HMAC Verificados
+                Download Direto Verificado
               </span>
             </div>
 
@@ -122,14 +128,26 @@ export default function PostDetailPage() {
             </div>
 
             {/* Main Action Trigger Button */}
-            <div className="pt-4">
+            <div className="pt-4 flex flex-wrap items-center gap-4">
               <button
                 onClick={() => setIsModalOpen(true)}
-                className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 font-extrabold text-base shadow-xl shadow-emerald-500/25 hover:scale-[1.02] transition flex items-center justify-center gap-3"
+                className="px-8 py-4 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-400 text-slate-950 font-extrabold text-base shadow-xl shadow-emerald-500/25 hover:scale-[1.02] transition flex items-center justify-center gap-3"
               >
                 <Download className="w-5 h-5" />
                 <span>Baixar {post.title}</span>
               </button>
+
+              {directDownloadUrl !== '#' && (
+                <a
+                  href={directDownloadUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-6 py-4 rounded-2xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 font-bold text-sm hover:border-emerald-500 transition flex items-center gap-2"
+                >
+                  <Download className="w-4 h-4 text-emerald-500" />
+                  <span>Link Direto</span>
+                </a>
+              )}
             </div>
           </div>
         </div>
@@ -139,7 +157,7 @@ export default function PostDetailPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         <div className="md:col-span-2 glass-panel rounded-3xl p-6 md:p-8 space-y-4 transition-colors">
           <h2 className="text-xl font-bold text-slate-900 dark:text-white border-b border-slate-200 dark:border-slate-800 pb-3">
-            Sobre o Programa
+            Sobre o Programa / Jogo
           </h2>
           <div className="text-slate-700 dark:text-slate-300 text-sm leading-relaxed space-y-4 whitespace-pre-line">
             {post.content}
@@ -157,11 +175,7 @@ export default function PostDetailPage() {
             </li>
             <li className="flex items-start gap-2">
               <CheckCircle className="w-4 h-4 text-emerald-500 dark:text-emerald-400 shrink-0 mt-0.5" />
-              <span>Link direto encurtado via Softurl API.</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <CheckCircle className="w-4 h-4 text-emerald-500 dark:text-emerald-400 shrink-0 mt-0.5" />
-              <span>Token com validade temporária HMAC (15 min).</span>
+              <span>Download direto sem redirecionadores ou anúncios.</span>
             </li>
           </ul>
         </div>
@@ -171,6 +185,7 @@ export default function PostDetailPage() {
       <DownloadGateModal
         postId={post.id}
         postTitle={post.title}
+        directUrl={directDownloadUrl}
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
       />

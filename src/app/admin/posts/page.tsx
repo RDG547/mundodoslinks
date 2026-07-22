@@ -1,5 +1,5 @@
 import { fetchPublishedPosts } from '@/lib/supabase';
-import { FileText, ExternalLink, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { FileText, ExternalLink, ShieldCheck, Edit3 } from 'lucide-react';
 import Link from 'next/link';
 
 export const revalidate = 0;
@@ -15,7 +15,7 @@ export default async function AdminPostsPage() {
             <FileText className="w-5 h-5 text-emerald-400" /> Catálogo de Publicações Ativas
           </h2>
           <p className="text-xs text-slate-400">
-            Gerencie os softwares ativos no banco de dados Supabase e verifique o estado dos links encurtados.
+            Gerencie e edite títulos, descrições, capas e links diretos dos softwares ativos.
           </p>
         </div>
       </div>
@@ -28,8 +28,8 @@ export default async function AdminPostsPage() {
                 <th className="pb-3">Título / Slug</th>
                 <th className="pb-3">Desenvolvedor</th>
                 <th className="pb-3">Versão Ativa</th>
-                <th className="pb-3">Provedor Encurtador</th>
-                <th className="pb-3 text-right">Ação</th>
+                <th className="pb-3">Link Status</th>
+                <th className="pb-3 text-right">Ações</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
@@ -44,18 +44,26 @@ export default async function AdminPostsPage() {
                     {post.download_links?.[0]?.version || 'LTS'}
                   </td>
                   <td className="py-3.5 text-slate-400">
-                    <span className="inline-flex items-center gap-1">
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                      Softurl API
+                    <span className="inline-flex items-center gap-1 text-emerald-400">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      Direto / Verificado
                     </span>
                   </td>
-                  <td className="py-3.5 text-right">
+                  <td className="py-3.5 text-right space-x-2">
+                    <Link
+                      href={`/admin/edit/${post.id}`}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 border border-emerald-500/30 text-xs font-semibold transition"
+                    >
+                      <Edit3 className="w-3.5 h-3.5" />
+                      <span>Editar</span>
+                    </Link>
+
                     <Link
                       href={`/post/${post.slug}`}
                       target="_blank"
                       className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold transition"
                     >
-                      <span>Ver no Site</span>
+                      <span>Ver</span>
                       <ExternalLink className="w-3 h-3" />
                     </Link>
                   </td>

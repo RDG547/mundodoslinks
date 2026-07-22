@@ -10,7 +10,7 @@ export interface RssRepackItem {
   coverUrl?: string;
   excerpt?: string;
   content?: string;
-  categorySlug: 'jogos-repacks' | 'jogos-indie' | 'softwares-livres' | 'utilitarios';
+  categorySlug: 'softwares-livres' | 'jogos-indie' | 'utilitarios' | 'midias-autorizadas';
   sourceGroup: 'FitGirl' | 'DODI' | 'ElAmigos' | 'FileHorse' | 'PortableApps';
 }
 
@@ -33,21 +33,47 @@ const IGNORED_TITLE_PATTERNS = [
   /a\s+call\s+for\s+donations/i,
 ];
 
+// Fallbacks de imagens de alta definição por categoria
+const CATEGORY_COVERS = {
+  'jogos-indie': [
+    'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=800&q=80',
+    'https://images.unsplash.com/photo-1538481199705-c710c4e965fc?auto=format&fit=crop&w=800&q=80',
+    'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80',
+  ],
+  'softwares-livres': [
+    'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80',
+    'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=800&q=80',
+  ],
+  'utilitarios': [
+    'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80',
+    'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=800&q=80',
+  ],
+  'midias-autorizadas': [
+    'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=800&q=80',
+  ],
+};
+
+function getRandomCategoryCover(categorySlug: keyof typeof CATEGORY_COVERS): string {
+  const covers = CATEGORY_COVERS[categorySlug] || CATEGORY_COVERS['jogos-indie'];
+  return covers[Math.floor(Math.random() * covers.length)];
+}
+
 /**
- * Extrai lançamentos de múltiplos provedores (FitGirl, DODI, ElAmigos, FileHorse, PortableApps)
+ * Extrai lançamentos de múltiplos provedores com capas garantidas e categorização estrita
  */
 export async function fetchRssRepacks(maxItemsTotal: number = 100): Promise<RssRepackItem[]> {
   const items: RssRepackItem[] = [];
 
   const feeds = [
-    // Jogos (WordPress paginado)
-    { group: 'FitGirl' as const, url: 'https://fitgirl-repacks.site/feed/?paged=1', categorySlug: 'jogos-repacks' as const },
-    { group: 'FitGirl' as const, url: 'https://fitgirl-repacks.site/feed/?paged=2', categorySlug: 'jogos-repacks' as const },
-    { group: 'DODI' as const, url: 'https://dodi-repacks.site/feed/?paged=1', categorySlug: 'jogos-repacks' as const },
-    { group: 'DODI' as const, url: 'https://dodi-repacks.site/feed/?paged=2', categorySlug: 'jogos-repacks' as const },
+    // Jogos (WordPress paginado) -> Categoria: Jogos Indie
+    { group: 'FitGirl' as const, url: 'https://fitgirl-repacks.site/feed/?paged=1', categorySlug: 'jogos-indie' as const },
+    { group: 'FitGirl' as const, url: 'https://fitgirl-repacks.site/feed/?paged=2', categorySlug: 'jogos-indie' as const },
+    { group: 'DODI' as const, url: 'https://dodi-repacks.site/feed/?paged=1', categorySlug: 'jogos-indie' as const },
+    { group: 'DODI' as const, url: 'https://dodi-repacks.site/feed/?paged=2', categorySlug: 'jogos-indie' as const },
     { group: 'ElAmigos' as const, url: 'https://elamigos.site/feed/', categorySlug: 'jogos-indie' as const },
-    // Softwares & Utilitários
+    // Softwares Livres
     { group: 'FileHorse' as const, url: 'https://filehorse.com/feed/', categorySlug: 'softwares-livres' as const },
+    // Utilitários
     { group: 'PortableApps' as const, url: 'https://portableapps.com/node/feed', categorySlug: 'utilitarios' as const },
   ];
 
@@ -103,6 +129,11 @@ export async function fetchRssRepacks(maxItemsTotal: number = 100): Promise<RssR
             if (imgMatch && !imgMatch[1].includes('torrent-stats') && !imgMatch[1].includes('icon-32x32')) {
               coverUrl = imgMatch[1];
             }
+          }
+
+          // Se não encontrou capa válida, atribui capa HD temática da categoria
+          if (!coverUrl) {
+            coverUrl = getRandomCategoryCover(feed.categorySlug);
           }
 
           // Converte HTML em texto limpo e traduz para PT-BR
