@@ -1,0 +1,40 @@
+name: Script de Raspagem Automatizada
+
+on:
+  schedule:
+    # O cron define o agendamento. Executa a cada 6 horas.
+    - cron: '0 */6 * * *'
+  
+  # Cria o botão no painel do GitHub para rodar manualmente
+  workflow_dispatch:
+
+jobs:
+  executar-raspador:
+    runs-on: ubuntu-latest
+
+    steps:
+    # 1. Baixa o código do repositório para a máquina virtual do GitHub
+    - name: Clonar o código do repositório
+      uses: actions/checkout@v4
+
+    # 2. Instala o ambiente do Node.js na máquina virtual
+    - name: Configurar o Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        cache: 'npm'
+
+    # 3. Instala as dependências do projeto
+    - name: Instalar dependências do projeto
+      run: npm install
+
+    # 4. Roda o script de automação injetando as chaves de segurança guardadas no GitHub Secrets
+    - name: Rodar o script de automação
+      env:
+        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+        SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        SOFTURL_API_TOKEN: ${{ secrets.SOFTURL_API_TOKEN }}
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        MINHA_CHAVE_CRIPTO: ${{ secrets.MINHA_CHAVE_CRIPTO }}
+      run: npx tsx automation/import-content.ts

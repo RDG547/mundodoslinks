@@ -1,0 +1,33 @@
+name: Automação do Mundo dos Links
+
+on:
+  schedule:
+    - cron: '0 */6 * * *' # Executa a cada 6 horas
+  workflow_dispatch: # Permite execução manual no painel do GitHub
+
+jobs:
+  run-automation:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout do Repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Instalar Dependências
+        run: npm install
+
+      - name: Executar Pipeline de Importação
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SOFTURL_API_TOKEN: ${{ secrets.SOFTURL_API_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          MINHA_CHAVE_CRIPTO: ${{ secrets.MINHA_CHAVE_CRIPTO }}
+        run: npx tsx automation/import-content.ts
