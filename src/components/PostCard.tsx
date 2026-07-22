@@ -20,37 +20,37 @@ export default function PostCard({ post }: PostCardProps) {
       href={`/post/${post.slug}`}
       className="glass-card rounded-2xl overflow-hidden flex flex-col group h-full transition-all duration-300 hover:border-emerald-500/50 hover:shadow-xl hover:shadow-emerald-500/10 cursor-pointer"
     >
-      {/* Cover Image Container */}
-      <div className="relative h-48 w-full overflow-hidden bg-slate-200 dark:bg-slate-900">
+      {/* Cover Image Container with Perfect Fit */}
+      <div className="relative h-48 w-full overflow-hidden bg-slate-900 flex items-center justify-center p-1">
         {imgSrc ? (
           <Image
             src={imgSrc}
             alt={post.title}
             fill
-            className="object-cover group-hover:scale-105 transition-transform duration-500"
+            className="object-cover object-center group-hover:scale-105 transition-transform duration-500"
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
             unoptimized
             onError={() => setImgSrc(fallbackCover)}
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-900 dark:to-slate-800 text-slate-400 dark:text-slate-600">
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 text-slate-500">
             <Download className="w-12 h-12" />
           </div>
         )}
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-900/60 dark:from-[#090d16] via-transparent to-transparent"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent pointer-events-none"></div>
 
         {/* Category & Verified Badge */}
-        <div className="absolute top-3 left-3 flex items-center gap-2">
+        <div className="absolute top-3 left-3 flex items-center gap-2 z-10">
           {post.category && (
-            <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-900/80 backdrop-blur-md text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+            <span className="px-2.5 py-1 rounded-full text-[11px] font-semibold bg-slate-900/85 backdrop-blur-md text-emerald-400 border border-emerald-500/30 flex items-center gap-1 shadow-md">
               <Tag className="w-3 h-3" />
               {post.category.name}
             </span>
           )}
         </div>
 
-        <div className="absolute top-3 right-3">
-          <span className="p-1.5 rounded-full bg-slate-900/80 backdrop-blur-md text-emerald-400 border border-emerald-500/30">
+        <div className="absolute top-3 right-3 z-10">
+          <span className="p-1.5 rounded-full bg-slate-900/85 backdrop-blur-md text-emerald-400 border border-emerald-500/30 shadow-md">
             <ShieldCheck className="w-4 h-4" />
           </span>
         </div>

@@ -31,10 +31,10 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || proce
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * Função principal do Pipeline de Importação com Links Diretos, Capas Garantidas e Categorias Atualizadas
+ * Função principal do Pipeline com links magnets diretos, capas HD e criação automática de categorias
  */
 async function runImportPipeline() {
-  console.log('🤖 Iniciando esteira de raspagem com links diretos, capas garantidas e categorias estritas...');
+  console.log('🤖 Iniciando esteira de raspagem com extração de magnet direto e criação automática de categorias...');
 
   const rssItems: RssRepackItem[] = await fetchRssRepacks(100);
 
@@ -87,12 +87,28 @@ async function runImportPipeline() {
     excerpt = excerpt || `Download verificado do aplicativo/jogo ${title} fornecido por ${item.sourceGroup}.`;
     content = content || `Download verificado de ${title} com alta velocidade. Liberado pelo provedor ${item.sourceGroup}.`;
     
-    // Links Diretos sem Encurtador
+    // Link magnet direto
     const downloadUrl = item.magnetOrUrl;
     const publicUrl = downloadUrl; 
 
-    // Obtém ID da Categoria estrita (Softwares Livres, Jogos Indie, Utilitários, Mídias Autorizadas)
-    const categoryId = categoryMap.get(item.categorySlug) || categoryMap.get('softwares-livres') || categoryMap.get('jogos-indie');
+    // Criação e Vínculo Automático de Categoria
+    let categoryId = categoryMap.get(item.categorySlug);
+    if (!categoryId && supabase) {
+      const { data: newCat, error: catErr } = await supabase
+        .from('categories')
+        .insert({
+          name: item.categoryName,
+          slug: item.categorySlug,
+        })
+        .select('id')
+        .single();
+
+      if (!catErr && newCat) {
+        categoryId = newCat.id;
+        categoryMap.set(item.categorySlug, categoryId);
+        console.log(`✨ Nova categoria criada automaticamente: "${item.categoryName}" (${item.categorySlug})`);
+      }
+    }
 
     // Salva ou Atualiza no Supabase
     let postId = `local-${Date.now()}`;

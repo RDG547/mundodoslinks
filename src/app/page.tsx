@@ -1,28 +1,41 @@
-import { fetchPublishedPosts, MOCK_CATEGORIES } from '@/lib/supabase';
+import { fetchPublishedPosts, fetchCategories } from '@/lib/supabase';
 import PostCard from '@/components/PostCard';
 import Link from 'next/link';
-import { Sparkles, Download, Zap, Send, Layers, SearchX } from 'lucide-react';
+import { Sparkles, Download, Zap, Send, Layers, SearchX, ChevronLeft, ChevronRight } from 'lucide-react';
 
-export const revalidate = 60; // On-demand ISR / 60 seconds revalidation
+export const revalidate = 60; // On-demand ISR / 60 segundos revalidation
 
 interface HomePageProps {
   searchParams?: {
     search?: string;
+    page?: string;
   };
 }
 
+const POSTS_PER_PAGE = 20;
+
 export default async function HomePage({ searchParams }: HomePageProps) {
-  let posts = await fetchPublishedPosts();
+  let allPosts = await fetchPublishedPosts();
+  const categories = await fetchCategories();
+
   const searchQuery = searchParams?.search?.toLowerCase().trim() || '';
+  const currentPage = Math.max(1, parseInt(searchParams?.page || '1', 10));
 
   // Filtro Dinâmico em Tempo Real
   if (searchQuery) {
-    posts = posts.filter((post) =>
+    allPosts = allPosts.filter((post) =>
       post.title.toLowerCase().includes(searchQuery) ||
       (post.excerpt && post.excerpt.toLowerCase().includes(searchQuery)) ||
       (post.developer && post.developer.toLowerCase().includes(searchQuery))
     );
   }
+
+  // Paginação a cada 20 posts
+  const totalPosts = allPosts.length;
+  const totalPages = Math.ceil(totalPosts / POSTS_PER_PAGE) || 1;
+  const validPage = Math.min(currentPage, totalPages);
+  const startIndex = (validPage - 1) * POSTS_PER_PAGE;
+  const paginatedPosts = allPosts.slice(startIndex, startIndex + POSTS_PER_PAGE);
 
   return (
     <div className="space-y-12">
@@ -42,7 +55,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           </h1>
 
           <p className="text-slate-600 dark:text-slate-300 text-base md:text-lg leading-relaxed max-w-2xl">
-            Acesse lançamentos e atualizações com máxima velocidade de download, links protegidos por HMAC com validade temporária e notificação instantânea via Telegram.
+            Acesse lançamentos e atualizações com máxima velocidade de download direto, verificação antivírus e notificação instantânea via Telegram.
           </p>
 
           <div className="flex flex-wrap items-center gap-4 pt-2">
@@ -66,7 +79,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         </div>
       </section>
 
-      {/* Categories Filter Pills */}
+      {/* Categories Filter Pills (Buscadas do Banco) */}
       <section className="space-y-4">
         <div className="flex items-center justify-between">
           <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
@@ -81,7 +94,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           >
             Todos os Links
           </Link>
-          {MOCK_CATEGORIES.map((cat) => (
+          {categories.map((cat) => (
             <Link
               key={cat.id}
               href={`/categoria/${cat.slug}`}
@@ -101,11 +114,11 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             {searchQuery ? `Resultados da busca: "${searchQuery}"` : 'Lançamentos & Destaques'}
           </h2>
           <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold px-3 py-1 bg-slate-100 dark:bg-slate-900 rounded-full border border-slate-200 dark:border-slate-800">
-            {posts.length} {posts.length === 1 ? 'item disponível' : 'itens disponíveis'}
+            {totalPosts} {totalPosts === 1 ? 'item disponível' : 'itens disponíveis'} (Página {validPage} de {totalPages})
           </span>
         </div>
 
-        {posts.length === 0 ? (
+        {paginatedPosts.length === 0 ? (
           <div className="text-center py-20 glass-card rounded-2xl space-y-3">
             <SearchX className="w-12 h-12 text-slate-400 mx-auto" />
             <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200">Nenhum programa ou jogo encontrado</h3>
@@ -115,9 +128,40 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {posts.map((post) => (
+            {paginatedPosts.map((post) => (
               <PostCard key={post.id} post={post} />
             ))}
+          </div>
+        )}
+
+        {/* Paginação a cada 20 Posts */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-3 pt-8 border-t border-slate-200 dark:border-slate-800">
+            <Link
+              href={`/?page=${validPage - 1}${searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : ''}`}
+              className={`px-4 py-2 rounded-xl text-xs font-bold border transition flex items-center gap-1 ${
+                validPage <= 1
+                  ? 'pointer-events-none opacity-40 border-slate-300 dark:border-slate-800 text-slate-400'
+                  : 'bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 hover:border-emerald-500'
+              }`}
+            >
+              <ChevronLeft className="w-4 h-4" /> Anterior
+            </Link>
+
+            <span className="text-xs font-semibold text-slate-600 dark:text-slate-400">
+              Página {validPage} / {totalPages}
+            </span>
+
+            <Link
+              href={`/?page=${validPage + 1}${searchQuery ? `&search=${encodeURIComponent(searchQuery)}` : ''}`}
+              className={`px-4 py-2 rounded-xl text-xs font-bold border transition flex items-center gap-1 ${
+                validPage >= totalPages
+                  ? 'pointer-events-none opacity-40 border-slate-300 dark:border-slate-800 text-slate-400'
+                  : 'bg-slate-100 dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-200 hover:border-emerald-500'
+              }`}
+            >
+              Próxima <ChevronRight className="w-4 h-4" />
+            </Link>
           </div>
         )}
       </section>

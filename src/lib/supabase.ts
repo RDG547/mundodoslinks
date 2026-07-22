@@ -73,6 +73,22 @@ export const MOCK_POSTS: Post[] = [
   }
 ];
 
+export async function fetchCategories(): Promise<Category[]> {
+  try {
+    const { data, error } = await supabase
+      .from('categories')
+      .select('*')
+      .order('name', { ascending: true });
+
+    if (error || !data || data.length === 0) {
+      return MOCK_CATEGORIES;
+    }
+    return data as Category[];
+  } catch {
+    return MOCK_CATEGORIES;
+  }
+}
+
 export async function fetchPublishedPosts(): Promise<Post[]> {
   try {
     const { data, error } = await supabase

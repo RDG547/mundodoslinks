@@ -10,7 +10,8 @@ export interface RssRepackItem {
   coverUrl?: string;
   excerpt?: string;
   content?: string;
-  categorySlug: 'softwares-livres' | 'jogos-indie' | 'utilitarios' | 'midias-autorizadas';
+  categoryName: string;
+  categorySlug: string;
   sourceGroup: 'FitGirl' | 'DODI' | 'ElAmigos' | 'FileHorse' | 'PortableApps';
 }
 
@@ -34,47 +35,56 @@ const IGNORED_TITLE_PATTERNS = [
 ];
 
 // Fallbacks de imagens de alta definição por categoria
-const CATEGORY_COVERS = {
-  'jogos-indie': [
-    'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=800&q=80',
-    'https://images.unsplash.com/photo-1538481199705-c710c4e965fc?auto=format&fit=crop&w=800&q=80',
-    'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80',
-  ],
-  'softwares-livres': [
-    'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80',
-    'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=800&q=80',
-  ],
-  'utilitarios': [
-    'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80',
-    'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=800&q=80',
-  ],
-  'midias-autorizadas': [
-    'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?auto=format&fit=crop&w=800&q=80',
-  ],
-};
+const CATEGORY_COVERS = [
+  'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=800&q=80',
+  'https://images.unsplash.com/photo-1538481199705-c710c4e965fc?auto=format&fit=crop&w=800&q=80',
+  'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=800&q=80',
+  'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=800&q=80',
+  'https://images.unsplash.com/photo-1581092160607-ee22621dd758?auto=format&fit=crop&w=800&q=80',
+];
 
-function getRandomCategoryCover(categorySlug: keyof typeof CATEGORY_COVERS): string {
-  const covers = CATEGORY_COVERS[categorySlug] || CATEGORY_COVERS['jogos-indie'];
-  return covers[Math.floor(Math.random() * covers.length)];
+function getRandomCover(): string {
+  return CATEGORY_COVERS[Math.floor(Math.random() * CATEGORY_COVERS.length)];
 }
 
 /**
- * Extrai lançamentos de múltiplos provedores com capas garantidas e categorização estrita
+ * Busca o link magnet direto navegando na página do post caso o RSS não tenha o magnet solto
+ */
+async function extractMagnetFromPage(pageUrl: string): Promise<string | null> {
+  try {
+    const res = await axios.get(pageUrl, {
+      timeout: 8000,
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+    });
+    const html = res.data;
+    const magnetMatch = html.match(/(magnet:\?xt=urn:btih:[^\s"<>']+)/i);
+    if (magnetMatch) {
+      return decodeHtmlEntities(magnetMatch[1]);
+    }
+    const torrentMatch = html.match(/(https?:\/\/[^\s"<>']+\.torrent)/i);
+    if (torrentMatch) {
+      return torrentMatch[1];
+    }
+  } catch {
+    // Ignora se falhar
+  }
+  return null;
+}
+
+/**
+ * Extrai lançamentos de múltiplos provedores com criação automática de categorias
  */
 export async function fetchRssRepacks(maxItemsTotal: number = 100): Promise<RssRepackItem[]> {
   const items: RssRepackItem[] = [];
 
   const feeds = [
-    // Jogos (WordPress paginado) -> Categoria: Jogos Indie
-    { group: 'FitGirl' as const, url: 'https://fitgirl-repacks.site/feed/?paged=1', categorySlug: 'jogos-indie' as const },
-    { group: 'FitGirl' as const, url: 'https://fitgirl-repacks.site/feed/?paged=2', categorySlug: 'jogos-indie' as const },
-    { group: 'DODI' as const, url: 'https://dodi-repacks.site/feed/?paged=1', categorySlug: 'jogos-indie' as const },
-    { group: 'DODI' as const, url: 'https://dodi-repacks.site/feed/?paged=2', categorySlug: 'jogos-indie' as const },
-    { group: 'ElAmigos' as const, url: 'https://elamigos.site/feed/', categorySlug: 'jogos-indie' as const },
-    // Softwares Livres
-    { group: 'FileHorse' as const, url: 'https://filehorse.com/feed/', categorySlug: 'softwares-livres' as const },
-    // Utilitários
-    { group: 'PortableApps' as const, url: 'https://portableapps.com/node/feed', categorySlug: 'utilitarios' as const },
+    { group: 'FitGirl' as const, url: 'https://fitgirl-repacks.site/feed/?paged=1', categoryName: 'Jogos Repacks', categorySlug: 'jogos-repacks' },
+    { group: 'FitGirl' as const, url: 'https://fitgirl-repacks.site/feed/?paged=2', categoryName: 'Jogos Repacks', categorySlug: 'jogos-repacks' },
+    { group: 'DODI' as const, url: 'https://dodi-repacks.site/feed/?paged=1', categoryName: 'Jogos Repacks', categorySlug: 'jogos-repacks' },
+    { group: 'DODI' as const, url: 'https://dodi-repacks.site/feed/?paged=2', categoryName: 'Jogos Repacks', categorySlug: 'jogos-repacks' },
+    { group: 'ElAmigos' as const, url: 'https://elamigos.site/feed/', categoryName: 'Jogos Indie', categorySlug: 'jogos-indie' },
+    { group: 'FileHorse' as const, url: 'https://filehorse.com/feed/', categoryName: 'Softwares Livres', categorySlug: 'softwares-livres' },
+    { group: 'PortableApps' as const, url: 'https://portableapps.com/node/feed', categoryName: 'Utilitários', categorySlug: 'utilitarios' },
   ];
 
   for (const feed of feeds) {
@@ -106,7 +116,7 @@ export async function fetchRssRepacks(maxItemsTotal: number = 100): Promise<RssR
         const rawTitle = titleMatch ? titleMatch[1].trim() : '';
         const itemLink = linkMatch ? linkMatch[1].trim() : '';
         const pubDate = pubDateMatch ? pubDateMatch[1].trim() : new Date().toISOString();
-        const magnetOrUrl = magnetMatch ? magnetMatch[1] : itemLink;
+        let magnetOrUrl = magnetMatch ? decodeHtmlEntities(magnetMatch[1]) : '';
         const htmlContent = contentMatch ? contentMatch[1] : '';
 
         if (IGNORED_TITLE_PATTERNS.some(p => p.test(rawTitle))) {
@@ -116,6 +126,12 @@ export async function fetchRssRepacks(maxItemsTotal: number = 100): Promise<RssR
         const cleanedTitle = cleanTitle(rawTitle);
 
         if (cleanedTitle && itemLink) {
+          // Se não encontrou o magnet no RSS XML, busca diretamente no HTML da página do post
+          if (!magnetOrUrl || !magnetOrUrl.startsWith('magnet:')) {
+            const pageMagnet = await extractMagnetFromPage(itemLink);
+            magnetOrUrl = pageMagnet || itemLink;
+          }
+
           // Extrai capa do HTML ou Steam App ID
           let coverUrl: string | undefined = undefined;
           const steamAppMatch = htmlContent.match(/steamstatic\.com\/(?:store_item_assets\/)?steam\/apps\/(\d+)/i) ||
@@ -131,12 +147,10 @@ export async function fetchRssRepacks(maxItemsTotal: number = 100): Promise<RssR
             }
           }
 
-          // Se não encontrou capa válida, atribui capa HD temática da categoria
           if (!coverUrl) {
-            coverUrl = getRandomCategoryCover(feed.categorySlug);
+            coverUrl = getRandomCover();
           }
 
-          // Converte HTML em texto limpo e traduz para PT-BR
           const textClean = stripHtml(htmlContent);
           const ptExcerpt = translateToPtBr(textClean.substring(0, 220)) + '...';
           const ptContent = translateToPtBr(textClean.substring(0, 1500));
@@ -150,6 +164,7 @@ export async function fetchRssRepacks(maxItemsTotal: number = 100): Promise<RssR
             coverUrl,
             excerpt: ptExcerpt,
             content: ptContent,
+            categoryName: feed.categoryName,
             categorySlug: feed.categorySlug,
             sourceGroup: feed.group,
           });
