@@ -16,7 +16,10 @@ export default function PostCard({ post }: PostCardProps) {
   const fallbackCover = 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=800&q=80';
 
   return (
-    <div className="glass-card rounded-2xl overflow-hidden flex flex-col group h-full transition-colors">
+    <Link
+      href={`/post/${post.slug}`}
+      className="glass-card rounded-2xl overflow-hidden flex flex-col group h-full transition-all duration-300 hover:border-emerald-500/50 hover:shadow-xl hover:shadow-emerald-500/10 cursor-pointer"
+    >
       {/* Cover Image Container */}
       <div className="relative h-48 w-full overflow-hidden bg-slate-200 dark:bg-slate-900">
         {imgSrc ? (
@@ -76,15 +79,12 @@ export default function PostCard({ post }: PostCardProps) {
             {version}
           </span>
 
-          <Link
-            href={`/post/${post.slug}`}
-            className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-md shadow-emerald-500/20 transition-all hover:scale-[1.02]"
-          >
+          <span className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-emerald-500 group-hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow-md shadow-emerald-500/20 transition-all group-hover:scale-105">
             <Download className="w-3.5 h-3.5" />
             <span>Download</span>
-          </Link>
+          </span>
         </div>
       </div>
-    </div>
+    </Link>
   );
 }

@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { translateToPtBr } from '../services/translator';
+import { cleanTitle, translateToPtBr, stripHtml, decodeHtmlEntities } from '../services/translator';
 
 export interface RssRepackItem {
   title: string;
@@ -12,34 +12,6 @@ export interface RssRepackItem {
   content?: string;
   categorySlug: 'jogos-repacks' | 'jogos-indie' | 'softwares-livres' | 'utilitarios';
   sourceGroup: 'FitGirl' | 'DODI' | 'ElAmigos' | 'FileHorse' | 'PortableApps';
-}
-
-/**
- * Decodifica entidades HTML comuns
- */
-export function decodeHtmlEntities(str: string): string {
-  return str
-    .replace(/&#8211;/g, '–')
-    .replace(/&#038;/g, '&')
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'");
-}
-
-/**
- * Limpa o título do jogo/programa removendo prefixos e sufixos de grupo
- */
-export function cleanGameTitle(rawTitle: string): string {
-  let title = decodeHtmlEntities(rawTitle);
-  title = title
-    .replace(/^\d+[-_\s]*/, '') // Remove prefixos 2147-, 756-
-    .replace(/\[\s*(DODI|FitGirl|ElAmigos)\s*Repack\s*\]/gi, '')
-    .replace(/\(From\s*[\d.]+\s*GB\)/gi, '')
-    .replace(/\s*Portable$/gi, ' Portable')
-    .trim();
-  return title;
 }
 
 function generateSlug(title: string, group: string): string {
@@ -58,22 +30,21 @@ const IGNORED_TITLE_PATTERNS = [
   /updates\s+digest/i,
   /site\s+news/i,
   /modding\s+guide/i,
+  /a\s+call\s+for\s+donations/i,
 ];
 
 /**
- * Extrai mais de 100+ lançamentos de múltiplos provedores (FitGirl, DODI, ElAmigos, FileHorse, PortableApps)
+ * Extrai lançamentos de múltiplos provedores (FitGirl, DODI, ElAmigos, FileHorse, PortableApps)
  */
 export async function fetchRssRepacks(maxItemsTotal: number = 100): Promise<RssRepackItem[]> {
   const items: RssRepackItem[] = [];
 
   const feeds = [
-    // Jogos (WordPress paginado para pegar dezenas de itens)
+    // Jogos (WordPress paginado)
     { group: 'FitGirl' as const, url: 'https://fitgirl-repacks.site/feed/?paged=1', categorySlug: 'jogos-repacks' as const },
     { group: 'FitGirl' as const, url: 'https://fitgirl-repacks.site/feed/?paged=2', categorySlug: 'jogos-repacks' as const },
-    { group: 'FitGirl' as const, url: 'https://fitgirl-repacks.site/feed/?paged=3', categorySlug: 'jogos-repacks' as const },
     { group: 'DODI' as const, url: 'https://dodi-repacks.site/feed/?paged=1', categorySlug: 'jogos-repacks' as const },
     { group: 'DODI' as const, url: 'https://dodi-repacks.site/feed/?paged=2', categorySlug: 'jogos-repacks' as const },
-    { group: 'DODI' as const, url: 'https://dodi-repacks.site/feed/?paged=3', categorySlug: 'jogos-repacks' as const },
     { group: 'ElAmigos' as const, url: 'https://elamigos.site/feed/', categorySlug: 'jogos-indie' as const },
     // Softwares & Utilitários
     { group: 'FileHorse' as const, url: 'https://filehorse.com/feed/', categorySlug: 'softwares-livres' as const },
@@ -116,7 +87,7 @@ export async function fetchRssRepacks(maxItemsTotal: number = 100): Promise<RssR
           continue;
         }
 
-        const cleanedTitle = cleanGameTitle(rawTitle);
+        const cleanedTitle = cleanTitle(rawTitle);
 
         if (cleanedTitle && itemLink) {
           // Extrai capa do HTML ou Steam App ID
@@ -127,22 +98,17 @@ export async function fetchRssRepacks(maxItemsTotal: number = 100): Promise<RssR
             const appId = steamAppMatch[1];
             coverUrl = `https://shared.steamstatic.com/store_item_assets/steam/apps/${appId}/header.jpg`;
           } else {
-            const imgMatch = htmlContent.match(/<img[^>]+src=["'](https?:\/\/[^"'\s]+)["']/i);
+            const decodedHtml = decodeHtmlEntities(htmlContent);
+            const imgMatch = decodedHtml.match(/<img[^>]+src=["'](https?:\/\/[^"'\s]+)["']/i);
             if (imgMatch && !imgMatch[1].includes('torrent-stats') && !imgMatch[1].includes('icon-32x32')) {
               coverUrl = imgMatch[1];
             }
           }
 
-          // Extrai texto limpo e aplica tradução em PT-BR
-          const textParagraphs = htmlContent
-            .replace(/<style[\s\S]*?<\/style>/gi, '')
-            .replace(/<script[\s\S]*?<\/script>/gi, '')
-            .replace(/<[^>]+>/g, ' ')
-            .replace(/\s+/g, ' ')
-            .trim();
-
-          const ptExcerpt = translateToPtBr(textParagraphs.substring(0, 220)) + '...';
-          const ptContent = translateToPtBr(textParagraphs.substring(0, 1200));
+          // Converte HTML em texto limpo e traduz para PT-BR
+          const textClean = stripHtml(htmlContent);
+          const ptExcerpt = translateToPtBr(textClean.substring(0, 220)) + '...';
+          const ptContent = translateToPtBr(textClean.substring(0, 1500));
 
           items.push({
             title: cleanedTitle,

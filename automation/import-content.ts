@@ -1,10 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
-import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
 import { fetchRssRepacks, RssRepackItem } from './sources/rss';
 import { fetchGameMetadata, decodeHtmlEntities } from './services/rawg';
-import { translateToPtBr } from './services/translator';
+import { cleanTitle, translateToPtBr } from './services/translator';
 
 // Carrega variáveis do arquivo .env.local se estiver rodando via CLI local sem GitHub Actions
 try {
@@ -28,81 +27,15 @@ try {
 
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
-const SOFTURL_API_TOKEN = process.env.SOFTURL_API_TOKEN || '';
-const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '';
-const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '';
-const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://mundodoslinks.vercel.app';
-const TELEGRAM_CHANNEL_URL = 'https://t.me/MundodosLinksPosts';
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * Envia uma URL/Magnet para encurtamento na API do Softurl
- */
-async function encurtarUrl(originalUrl: string): Promise<string> {
-  if (!SOFTURL_API_TOKEN || SOFTURL_API_TOKEN === 'mock_softurl_token') {
-    return originalUrl;
-  }
-
-  try {
-    const encodedUrl = encodeURIComponent(originalUrl);
-    const endpoint = `https://softurl.in/api?api=${SOFTURL_API_TOKEN}&url=${encodedUrl}`;
-    const response = await axios.get(endpoint, { timeout: 10000 });
-
-    if (response.data && response.data.status === 'success' && response.data.shortenedUrl) {
-      return response.data.shortenedUrl;
-    }
-  } catch (err: any) {
-    console.warn(`[WARN] Falha ao encurtar link: ${err.message}. Mantendo URL original.`);
-  }
-  return originalUrl;
-}
-
-/**
- * Notifica o canal do Telegram via Bot API
- */
-async function notificarTelegram(titulo: string, slug: string, linkEncurtado: string, grupo: string) {
-  if (!TELEGRAM_BOT_TOKEN || TELEGRAM_BOT_TOKEN === 'mock_telegram_token' || !TELEGRAM_CHAT_ID) {
-    console.log(`[TELEGRAM] Notificação de "${titulo}" enviada para simulação (Canal: ${TELEGRAM_CHANNEL_URL}).`);
-    return;
-  }
-
-  try {
-    const postUrl = `${SITE_URL}/post/${slug}`;
-    const mensagem = 
-`🚀 *NOVO DOWNLOAD DISPONÍVEL!*
-
-📦 *${titulo}*
-🏷️ *Provedor/Grupo:* ${grupo}
-
-⬇️ *Link Direto de Download / Magnet:*
-${linkEncurtado}
-
-🔗 *Acesse a publicação completa:*
-${postUrl}
-
-📢 *Canal Oficial:* ${TELEGRAM_CHANNEL_URL}`;
-
-    const endpoint = `https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`;
-    await axios.post(endpoint, {
-      chat_id: TELEGRAM_CHAT_ID,
-      text: mensagem,
-      parse_mode: 'Markdown',
-      disable_web_page_preview: false,
-    });
-    console.log(`[TELEGRAM] Notificação enviada com sucesso para: ${titulo}`);
-  } catch (err: any) {
-    console.error(`[ERROR] Falha ao disparar mensagem no Telegram:`, err.response?.data || err.message);
-  }
-}
-
-/**
- * Função principal do Pipeline de Importação Massiva com Tradução PT-BR
+ * Função principal do Pipeline de Importação Massiva com Tradução PT-BR e Links Diretos
  */
 async function runImportPipeline() {
-  console.log('🤖 Iniciando esteira automatizada massiva de jogos e softwares (FitGirl, DODI, ElAmigos, FileHorse, PortableApps)...');
+  console.log('🤖 Iniciando esteira de raspagem com links diretos, títulos limpos e tradução PT-BR...');
 
-  // Busca até 100+ itens no total
   const rssItems: RssRepackItem[] = await fetchRssRepacks(100);
 
   if (rssItems.length === 0) {
@@ -116,7 +49,7 @@ async function runImportPipeline() {
     ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
     : null;
 
-  // Carrega categorias do Supabase para fazer vínculo correto
+  // Carrega categorias do Supabase para vincular os posts
   const categoryMap = new Map<string, string>();
   if (supabase) {
     const { data: dbCategories } = await supabase.from('categories').select('id, slug');
@@ -130,19 +63,19 @@ async function runImportPipeline() {
   let countProcessed = 0;
   for (const item of rssItems) {
     countProcessed++;
-    const cleanTitle = decodeHtmlEntities(item.title);
-    console.log(`\n[${countProcessed}/${rssItems.length}] 🔍 Processando: "${cleanTitle}" [${item.sourceGroup}]`);
+    const formattedTitle = cleanTitle(item.title);
+    console.log(`\n[${countProcessed}/${rssItems.length}] 🔍 Processando: "${formattedTitle}" [${item.sourceGroup}]`);
 
     let coverUrl = item.coverUrl;
     let excerpt = translateToPtBr(item.excerpt || '');
     let content = translateToPtBr(item.content || '');
     let developer = item.sourceGroup;
-    let title = cleanTitle;
+    let title = formattedTitle;
 
     if (!coverUrl || coverUrl.includes('unsplash')) {
-      const gameInfo = await fetchGameMetadata(cleanTitle);
+      const gameInfo = await fetchGameMetadata(formattedTitle);
       if (gameInfo) {
-        title = gameInfo.title || cleanTitle;
+        title = cleanTitle(gameInfo.title || formattedTitle);
         coverUrl = gameInfo.coverUrl;
         excerpt = excerpt || translateToPtBr(gameInfo.excerpt);
         content = content || translateToPtBr(gameInfo.content);
@@ -151,16 +84,15 @@ async function runImportPipeline() {
     }
 
     coverUrl = coverUrl || 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=800&q=80';
-    excerpt = excerpt || `Download verificado do programa/jogo ${cleanTitle} por ${item.sourceGroup} em alta velocidade.`;
-    content = content || `Download verificado de ${cleanTitle} com alta velocidade. Liberado pelo provedor ${item.sourceGroup}.`;
+    excerpt = excerpt || `Download verificado do aplicativo/jogo ${title} fornecido por ${item.sourceGroup}.`;
+    content = content || `Download verificado de ${title} com alta velocidade. Liberado pelo provedor ${item.sourceGroup}.`;
+    
+    // 1. DESATIVADO LINK ENCURTADO POR ENQUANTO (Usando link direto/magnet)
     const downloadUrl = item.magnetOrUrl;
+    const publicUrl = downloadUrl; 
 
-    // Obtém o ID da categoria no banco Supabase
-    let categoryId = categoryMap.get(item.categorySlug) || categoryMap.get('softwares-livres') || categoryMap.get('jogos-indie');
-
-    // Encurta a URL
-    const publicUrl = await encurtarUrl(downloadUrl);
-    await sleep(300);
+    // Obtém a categoria
+    const categoryId = categoryMap.get(item.categorySlug) || categoryMap.get('softwares-livres') || categoryMap.get('jogos-indie');
 
     // Salva ou Atualiza no Supabase
     let postId = `local-${Date.now()}`;
@@ -172,7 +104,7 @@ async function runImportPipeline() {
         .maybeSingle();
 
       if (postExistente) {
-        console.log(`🔄 [UPDATE] Atualizando registro existente no Supabase ID: ${postExistente.id}`);
+        console.log(`🔄 [UPDATE] Atualizando registro no Supabase (ID: ${postExistente.id}) com título limpo e PT-BR...`);
         await supabase
           .from('posts')
           .update({
@@ -209,10 +141,11 @@ async function runImportPipeline() {
             version: item.sourceGroup,
             original_url: downloadUrl,
             public_url: publicUrl,
-            shortener_provider: 'softurl',
+            shortener_provider: 'direct',
             status: 'active',
           });
         }
+        console.log(`✅ Registro ${title} atualizado com sucesso!`);
       } else {
         const { data: novoPost, error: errPost } = await supabase
           .from('posts')
@@ -231,7 +164,7 @@ async function runImportPipeline() {
           .single();
 
         if (errPost || !novoPost) {
-          console.error(`[ERROR] Falha ao inserir post no Supabase:`, errPost?.message || errPost);
+          console.error(`[ERROR] Falha ao inserir no Supabase:`, errPost?.message || errPost);
           continue;
         }
 
@@ -242,19 +175,20 @@ async function runImportPipeline() {
           version: item.sourceGroup,
           original_url: downloadUrl,
           public_url: publicUrl,
-          shortener_provider: 'softurl',
+          shortener_provider: 'direct',
           status: 'active',
         });
 
-        console.log(`✅ Novo registro inserido no Supabase (ID: ${postId})`);
-        await notificarTelegram(title, item.slug, publicUrl, item.sourceGroup);
+        console.log(`✅ Novo registro ${title} inserido no Supabase (ID: ${postId})`);
       }
     } else {
       console.log(`ℹ️ [DRY RUN] Item processado: ${title}`);
     }
+
+    await sleep(200);
   }
 
-  console.log('\n🎉 Esteira de automação massiva concluída com sucesso!');
+  console.log('\n🎉 Esteira concluída com sucesso!');
 }
 
 runImportPipeline().catch((err) => {
