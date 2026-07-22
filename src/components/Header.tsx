@@ -58,7 +58,7 @@ export default function Header() {
           </button>
 
           <Link
-            href="https://t.me"
+            href="https://t.me/MundodosLinksPosts"
             target="_blank"
             className="hidden sm:flex items-center gap-2 text-xs font-semibold px-3 py-2 rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400 border border-sky-500/20 hover:bg-sky-500/20 transition"
           >

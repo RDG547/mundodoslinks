@@ -12,6 +12,14 @@ const nextConfig = {
       },
       {
         protocol: 'https',
+        hostname: 'shared.steamstatic.com',
+      },
+      {
+        protocol: 'https',
+        hostname: 'shared.cloudflare.steamstatic.com',
+      },
+      {
+        protocol: 'https',
         hostname: 'cdn.akamai.steamstatic.com',
       },
       {
@@ -20,11 +28,11 @@ const nextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'shared.akamai.steamstatic.com',
+        hostname: '*.steamstatic.com',
       },
       {
         protocol: 'https',
-        hostname: '*.steamstatic.com',
+        hostname: '*.riotpixels.net',
       },
       {
         protocol: 'https',

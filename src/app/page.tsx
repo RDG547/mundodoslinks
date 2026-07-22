@@ -39,7 +39,7 @@ export default async function HomePage() {
             </a>
 
             <Link
-              href="https://t.me"
+              href="https://t.me/MundodosLinksPosts"
               target="_blank"
               className="px-6 py-3.5 rounded-2xl bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-slate-700/80 text-sky-600 dark:text-sky-400 hover:bg-slate-100 dark:hover:bg-slate-800 font-bold text-sm transition flex items-center gap-2 shadow-sm"
             >

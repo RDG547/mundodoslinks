@@ -1,3 +1,6 @@
+'use client';
+
+import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Download, ShieldCheck, Tag, Code2 } from 'lucide-react';
@@ -8,19 +11,23 @@ interface PostCardProps {
 }
 
 export default function PostCard({ post }: PostCardProps) {
+  const [imgSrc, setImgSrc] = useState<string | null>(post.cover_url || null);
   const version = post.download_links?.[0]?.version || 'Versão Recente';
+  const fallbackCover = 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=800&q=80';
 
   return (
     <div className="glass-card rounded-2xl overflow-hidden flex flex-col group h-full transition-colors">
       {/* Cover Image Container */}
       <div className="relative h-48 w-full overflow-hidden bg-slate-200 dark:bg-slate-900">
-        {post.cover_url ? (
+        {imgSrc ? (
           <Image
-            src={post.cover_url}
+            src={imgSrc}
             alt={post.title}
             fill
             className="object-cover group-hover:scale-105 transition-transform duration-500"
             sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+            unoptimized
+            onError={() => setImgSrc(fallbackCover)}
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-slate-100 to-slate-200 dark:from-slate-900 dark:to-slate-800 text-slate-400 dark:text-slate-600">
