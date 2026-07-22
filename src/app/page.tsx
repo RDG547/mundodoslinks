@@ -1,12 +1,28 @@
 import { fetchPublishedPosts, MOCK_CATEGORIES } from '@/lib/supabase';
 import PostCard from '@/components/PostCard';
 import Link from 'next/link';
-import { Sparkles, Download, Zap, Send, Layers } from 'lucide-react';
+import { Sparkles, Download, Zap, Send, Layers, SearchX } from 'lucide-react';
 
 export const revalidate = 60; // On-demand ISR / 60 seconds revalidation
 
-export default async function HomePage() {
-  const posts = await fetchPublishedPosts();
+interface HomePageProps {
+  searchParams?: {
+    search?: string;
+  };
+}
+
+export default async function HomePage({ searchParams }: HomePageProps) {
+  let posts = await fetchPublishedPosts();
+  const searchQuery = searchParams?.search?.toLowerCase().trim() || '';
+
+  // Filtro Dinâmico em Tempo Real
+  if (searchQuery) {
+    posts = posts.filter((post) =>
+      post.title.toLowerCase().includes(searchQuery) ||
+      (post.excerpt && post.excerpt.toLowerCase().includes(searchQuery)) ||
+      (post.developer && post.developer.toLowerCase().includes(searchQuery))
+    );
+  }
 
   return (
     <div className="space-y-12">
@@ -44,7 +60,7 @@ export default async function HomePage() {
               className="px-6 py-3.5 rounded-2xl bg-white dark:bg-slate-900/90 border border-slate-300 dark:border-slate-700/80 text-sky-600 dark:text-sky-400 hover:bg-slate-100 dark:hover:bg-slate-800 font-bold text-sm transition flex items-center gap-2 shadow-sm"
             >
               <Send className="w-4 h-4" />
-              <span>Canal no Telegram</span>
+              <span>Canal do Telegram</span>
             </Link>
           </div>
         </div>
@@ -81,16 +97,21 @@ export default async function HomePage() {
       <section id="posts-grid" className="space-y-6">
         <div className="flex items-center justify-between border-b border-slate-200 dark:border-slate-800/80 pb-4">
           <h2 className="text-2xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
-            <Zap className="w-6 h-6 text-emerald-500 dark:text-emerald-400" /> Lançamentos & Destaques
+            <Zap className="w-6 h-6 text-emerald-500 dark:text-emerald-400" />
+            {searchQuery ? `Resultados da busca: "${searchQuery}"` : 'Lançamentos & Destaques'}
           </h2>
-          <span className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-            {posts.length} {posts.length === 1 ? 'item encontrado' : 'itens encontrados'}
+          <span className="text-xs text-slate-500 dark:text-slate-400 font-semibold px-3 py-1 bg-slate-100 dark:bg-slate-900 rounded-full border border-slate-200 dark:border-slate-800">
+            {posts.length} {posts.length === 1 ? 'item disponível' : 'itens disponíveis'}
           </span>
         </div>
 
         {posts.length === 0 ? (
-          <div className="text-center py-16 glass-card rounded-2xl">
-            <p className="text-slate-500 dark:text-slate-400">Nenhum programa publicado no momento.</p>
+          <div className="text-center py-20 glass-card rounded-2xl space-y-3">
+            <SearchX className="w-12 h-12 text-slate-400 mx-auto" />
+            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200">Nenhum programa ou jogo encontrado</h3>
+            <p className="text-slate-500 dark:text-slate-400 text-sm">
+              Tente buscar por termos mais genéricos ou explore as categorias.
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { translateToPtBr } from '../services/translator';
 
 export interface RssRepackItem {
   title: string;
@@ -9,11 +10,12 @@ export interface RssRepackItem {
   coverUrl?: string;
   excerpt?: string;
   content?: string;
-  sourceGroup: 'FitGirl' | 'DODI';
+  categorySlug: 'jogos-repacks' | 'jogos-indie' | 'softwares-livres' | 'utilitarios';
+  sourceGroup: 'FitGirl' | 'DODI' | 'ElAmigos' | 'FileHorse' | 'PortableApps';
 }
 
 /**
- * Decodifica entidades HTML comuns como &#8211; e &#038;
+ * Decodifica entidades HTML comuns
  */
 export function decodeHtmlEntities(str: string): string {
   return str
@@ -27,30 +29,29 @@ export function decodeHtmlEntities(str: string): string {
 }
 
 /**
- * Limpa o título do jogo removendo prefixos de id (ex: 2147-, 756-), sufixos de grupo ([DODI Repack])
+ * Limpa o título do jogo/programa removendo prefixos e sufixos de grupo
  */
 export function cleanGameTitle(rawTitle: string): string {
   let title = decodeHtmlEntities(rawTitle);
   title = title
-    .replace(/^\d+[-_\s]*/, '') // Remove 2147- ou 756-
-    .replace(/\[\s*(DODI|FitGirl)\s*Repack\s*\]/gi, '') // Remove [DODI Repack]
-    .replace(/\(From\s*[\d.]+\s*GB\)/gi, '') // Remove (From 90.7 GB)
+    .replace(/^\d+[-_\s]*/, '') // Remove prefixos 2147-, 756-
+    .replace(/\[\s*(DODI|FitGirl|ElAmigos)\s*Repack\s*\]/gi, '')
+    .replace(/\(From\s*[\d.]+\s*GB\)/gi, '')
+    .replace(/\s*Portable$/gi, ' Portable')
     .trim();
   return title;
 }
 
-function generateSlug(title: string): string {
-  return title
+function generateSlug(title: string, group: string): string {
+  const clean = title
     .toLowerCase()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)+/g, '');
+  return `${clean}-${group.toLowerCase()}`;
 }
 
-/**
- * Títulos a ignorar por não serem lançamentos de jogos
- */
 const IGNORED_TITLE_PATTERNS = [
   /upcoming\s+repacks/i,
   /weekly\s+digest/i,
@@ -60,21 +61,32 @@ const IGNORED_TITLE_PATTERNS = [
 ];
 
 /**
- * Extrai TODOS os lançamentos dos feeds RSS oficiais do FitGirl e DODI com capas e descrições completas
+ * Extrai mais de 100+ lançamentos de múltiplos provedores (FitGirl, DODI, ElAmigos, FileHorse, PortableApps)
  */
-export async function fetchRssRepacks(limitPerSource: number = 30): Promise<RssRepackItem[]> {
+export async function fetchRssRepacks(maxItemsTotal: number = 100): Promise<RssRepackItem[]> {
   const items: RssRepackItem[] = [];
 
   const feeds = [
-    { group: 'FitGirl' as const, url: 'https://fitgirl-repacks.site/feed/' },
-    { group: 'DODI' as const, url: 'https://dodi-repacks.site/feed/' },
+    // Jogos (WordPress paginado para pegar dezenas de itens)
+    { group: 'FitGirl' as const, url: 'https://fitgirl-repacks.site/feed/?paged=1', categorySlug: 'jogos-repacks' as const },
+    { group: 'FitGirl' as const, url: 'https://fitgirl-repacks.site/feed/?paged=2', categorySlug: 'jogos-repacks' as const },
+    { group: 'FitGirl' as const, url: 'https://fitgirl-repacks.site/feed/?paged=3', categorySlug: 'jogos-repacks' as const },
+    { group: 'DODI' as const, url: 'https://dodi-repacks.site/feed/?paged=1', categorySlug: 'jogos-repacks' as const },
+    { group: 'DODI' as const, url: 'https://dodi-repacks.site/feed/?paged=2', categorySlug: 'jogos-repacks' as const },
+    { group: 'DODI' as const, url: 'https://dodi-repacks.site/feed/?paged=3', categorySlug: 'jogos-repacks' as const },
+    { group: 'ElAmigos' as const, url: 'https://elamigos.site/feed/', categorySlug: 'jogos-indie' as const },
+    // Softwares & Utilitários
+    { group: 'FileHorse' as const, url: 'https://filehorse.com/feed/', categorySlug: 'softwares-livres' as const },
+    { group: 'PortableApps' as const, url: 'https://portableapps.com/node/feed', categorySlug: 'utilitarios' as const },
   ];
 
   for (const feed of feeds) {
+    if (items.length >= maxItemsTotal) break;
+
     try {
-      console.log(`🌐 Lendo todos os lançamentos do feed RSS oficial de ${feed.group}... (${feed.url})`);
+      console.log(`🌐 Lendo feed de ${feed.group}... (${feed.url})`);
       const response = await axios.get(feed.url, {
-        timeout: 15000,
+        timeout: 12000,
         headers: {
           'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
           'Accept': 'text/xml, application/xml, application/rss+xml, */*'
@@ -84,9 +96,8 @@ export async function fetchRssRepacks(limitPerSource: number = 30): Promise<RssR
       const xml = response.data;
       const itemMatches = xml.match(/<item>[\s\S]*?<\/item>/gi) || [];
 
-      let count = 0;
       for (const itemXml of itemMatches) {
-        if (count >= limitPerSource) break;
+        if (items.length >= maxItemsTotal) break;
 
         const titleMatch = itemXml.match(/<title>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/title>/i);
         const linkMatch = itemXml.match(/<link>(?:<!\[CDATA\[)?([\s\S]*?)(?:\]\]>)?<\/link>/i);
@@ -101,7 +112,6 @@ export async function fetchRssRepacks(limitPerSource: number = 30): Promise<RssR
         const magnetOrUrl = magnetMatch ? magnetMatch[1] : itemLink;
         const htmlContent = contentMatch ? contentMatch[1] : '';
 
-        // Ignora posts que não sejam lançamentos de jogos
         if (IGNORED_TITLE_PATTERNS.some(p => p.test(rawTitle))) {
           continue;
         }
@@ -109,24 +119,21 @@ export async function fetchRssRepacks(limitPerSource: number = 30): Promise<RssR
         const cleanedTitle = cleanGameTitle(rawTitle);
 
         if (cleanedTitle && itemLink) {
-          // 1. Tenta extrair a capa original diretamente do HTML do post RSS
+          // Extrai capa do HTML ou Steam App ID
           let coverUrl: string | undefined = undefined;
-          
-          // Checa se há referência ao Steam App ID na URL do trailer ou imagens
           const steamAppMatch = htmlContent.match(/steamstatic\.com\/(?:store_item_assets\/)?steam\/apps\/(\d+)/i) ||
                                 htmlContent.match(/store_trailers\/(\d+)/i);
           if (steamAppMatch) {
             const appId = steamAppMatch[1];
             coverUrl = `https://shared.steamstatic.com/store_item_assets/steam/apps/${appId}/header.jpg`;
           } else {
-            // Procura a primeira imagem válida no HTML
             const imgMatch = htmlContent.match(/<img[^>]+src=["'](https?:\/\/[^"'\s]+)["']/i);
             if (imgMatch && !imgMatch[1].includes('torrent-stats') && !imgMatch[1].includes('icon-32x32')) {
               coverUrl = imgMatch[1];
             }
           }
 
-          // 2. Extrai parágrafos de descrição limpos do HTML
+          // Extrai texto limpo e aplica tradução em PT-BR
           const textParagraphs = htmlContent
             .replace(/<style[\s\S]*?<\/style>/gi, '')
             .replace(/<script[\s\S]*?<\/script>/gi, '')
@@ -134,24 +141,25 @@ export async function fetchRssRepacks(limitPerSource: number = 30): Promise<RssR
             .replace(/\s+/g, ' ')
             .trim();
 
-          const excerpt = textParagraphs.substring(0, 200) + '...';
+          const ptExcerpt = translateToPtBr(textParagraphs.substring(0, 220)) + '...';
+          const ptContent = translateToPtBr(textParagraphs.substring(0, 1200));
 
           items.push({
             title: cleanedTitle,
-            slug: generateSlug(`${cleanedTitle}-${feed.group}`),
+            slug: generateSlug(cleanedTitle, feed.group),
             link: itemLink,
             magnetOrUrl: magnetOrUrl,
             pubDate: pubDate,
             coverUrl,
-            excerpt,
-            content: textParagraphs.substring(0, 1000),
+            excerpt: ptExcerpt,
+            content: ptContent,
+            categorySlug: feed.categorySlug,
             sourceGroup: feed.group,
           });
-          count++;
         }
       }
     } catch (err: any) {
-      console.warn(`[WARN] Falha ao consultar feed RSS ${feed.group}: ${err.message}`);
+      console.warn(`[WARN] Falha ao consultar feed ${feed.group}: ${err.message}`);
     }
   }
 

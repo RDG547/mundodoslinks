@@ -2,9 +2,9 @@ import { createClient } from '@supabase/supabase-js';
 import axios from 'axios';
 import fs from 'fs';
 import path from 'path';
-import { fetchHydraRepacks } from './sources/hydra';
 import { fetchRssRepacks, RssRepackItem } from './sources/rss';
 import { fetchGameMetadata, decodeHtmlEntities } from './services/rawg';
+import { translateToPtBr } from './services/translator';
 
 // Carrega variáveis do arquivo .env.local se estiver rodando via CLI local sem GitHub Actions
 try {
@@ -26,7 +26,6 @@ try {
   // Ignora se não houver .env.local
 }
 
-// Leitura das Chaves de Ambiente enviadas pelo GitHub Secrets / .env.local
 const SUPABASE_URL = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
 const SOFTURL_API_TOKEN = process.env.SOFTURL_API_TOKEN || '';
@@ -35,7 +34,6 @@ const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID || '';
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://mundodoslinks.vercel.app';
 const TELEGRAM_CHANNEL_URL = 'https://t.me/MundodosLinksPosts';
 
-// Helper para evitar estouro de limite de requisições (Rate Limit)
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
@@ -72,10 +70,10 @@ async function notificarTelegram(titulo: string, slug: string, linkEncurtado: st
   try {
     const postUrl = `${SITE_URL}/post/${slug}`;
     const mensagem = 
-`🚀 *NOVO REPACK DISPONÍVEL!*
+`🚀 *NOVO DOWNLOAD DISPONÍVEL!*
 
 📦 *${titulo}*
-🏷️ *Grupo:* ${grupo}
+🏷️ *Provedor/Grupo:* ${grupo}
 
 ⬇️ *Link Direto de Download / Magnet:*
 ${linkEncurtado}
@@ -99,73 +97,74 @@ ${postUrl}
 }
 
 /**
- * Função principal do Pipeline de Importação Automatizada
+ * Função principal do Pipeline de Importação Massiva com Tradução PT-BR
  */
 async function runImportPipeline() {
-  console.log('🤖 Iniciando esteira automatizada de jogos e repacks (Hydra, Feeds RSS, Steam & RAWG API)...');
+  console.log('🤖 Iniciando esteira automatizada massiva de jogos e softwares (FitGirl, DODI, ElAmigos, FileHorse, PortableApps)...');
 
-  let itemsToProcess = await fetchHydraRepacks(10);
+  // Busca até 100+ itens no total
+  const rssItems: RssRepackItem[] = await fetchRssRepacks(100);
 
-  if (itemsToProcess.length === 0) {
-    console.log('🔄 Alternando para ingestão completa via Feeds RSS Oficiais...');
-    const rssItems: RssRepackItem[] = await fetchRssRepacks(30);
-    itemsToProcess = rssItems.map(r => ({
-      title: decodeHtmlEntities(r.title),
-      slug: r.slug,
-      uris: [r.magnetOrUrl],
-      sourceGroup: r.sourceGroup,
-      coverUrl: r.coverUrl,
-      excerpt: r.excerpt,
-      content: r.content,
-    }));
-  }
-
-  if (itemsToProcess.length === 0) {
-    console.log('ℹ️ Nenhum novo item encontrado nas fontes no momento.');
+  if (rssItems.length === 0) {
+    console.log('ℹ️ Nenhum item encontrado nas fontes no momento.');
     return;
   }
+
+  console.log(`\n📦 Total de itens capturados nas fontes: ${rssItems.length}`);
 
   const supabase = (SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY)
     ? createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
     : null;
 
-  for (const item of itemsToProcess as any[]) {
-    const cleanTitle = decodeHtmlEntities(item.title);
-    console.log(`\n🔍 Processando item: "${cleanTitle}" [${item.sourceGroup}]`);
+  // Carrega categorias do Supabase para fazer vínculo correto
+  const categoryMap = new Map<string, string>();
+  if (supabase) {
+    const { data: dbCategories } = await supabase.from('categories').select('id, slug');
+    if (dbCategories) {
+      for (const cat of dbCategories) {
+        categoryMap.set(cat.slug, cat.id);
+      }
+    }
+  }
 
-    // 1. Busca capas e metadados na Steam API / RAWG API se a capa do RSS não veio definida
+  let countProcessed = 0;
+  for (const item of rssItems) {
+    countProcessed++;
+    const cleanTitle = decodeHtmlEntities(item.title);
+    console.log(`\n[${countProcessed}/${rssItems.length}] 🔍 Processando: "${cleanTitle}" [${item.sourceGroup}]`);
+
     let coverUrl = item.coverUrl;
-    let excerpt = item.excerpt;
-    let content = item.content;
+    let excerpt = translateToPtBr(item.excerpt || '');
+    let content = translateToPtBr(item.content || '');
     let developer = item.sourceGroup;
     let title = cleanTitle;
 
     if (!coverUrl || coverUrl.includes('unsplash')) {
-      console.log(`🎨 Enriquecendo metadados e capa via Steam / RAWG API...`);
       const gameInfo = await fetchGameMetadata(cleanTitle);
       if (gameInfo) {
         title = gameInfo.title || cleanTitle;
         coverUrl = gameInfo.coverUrl;
-        excerpt = excerpt || gameInfo.excerpt;
-        content = content || gameInfo.content;
+        excerpt = excerpt || translateToPtBr(gameInfo.excerpt);
+        content = content || translateToPtBr(gameInfo.content);
         developer = gameInfo.developer || item.sourceGroup;
       }
     }
 
     coverUrl = coverUrl || 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?auto=format&fit=crop&w=800&q=80';
-    excerpt = excerpt || `Repack verificado do jogo ${cleanTitle} por ${item.sourceGroup}.`;
-    content = content || `Download verificado de ${cleanTitle} com alta velocidade. Liberado pelo grupo ${item.sourceGroup}.`;
-    const downloadUrl = item.uris[0];
+    excerpt = excerpt || `Download verificado do programa/jogo ${cleanTitle} por ${item.sourceGroup} em alta velocidade.`;
+    content = content || `Download verificado de ${cleanTitle} com alta velocidade. Liberado pelo provedor ${item.sourceGroup}.`;
+    const downloadUrl = item.magnetOrUrl;
 
-    // 2. Encurta o link via Softurl API
-    console.log('🔗 Solicitando link monetizado na API do Softurl...');
+    // Obtém o ID da categoria no banco Supabase
+    let categoryId = categoryMap.get(item.categorySlug) || categoryMap.get('softwares-livres') || categoryMap.get('jogos-indie');
+
+    // Encurta a URL
     const publicUrl = await encurtarUrl(downloadUrl);
-    await sleep(500);
+    await sleep(300);
 
-    // 3. Salva ou atualiza no Supabase (se configurado)
+    // Salva ou Atualiza no Supabase
     let postId = `local-${Date.now()}`;
     if (supabase) {
-      // Checa se o post já existe no banco
       const { data: postExistente } = await supabase
         .from('posts')
         .select('id')
@@ -182,13 +181,13 @@ async function runImportPipeline() {
             content,
             cover_url: coverUrl,
             developer,
+            category_id: categoryId,
             updated_at: new Date().toISOString(),
           })
           .eq('id', postExistente.id);
 
         postId = postExistente.id;
 
-        // Atualiza link de download
         const { data: linkExistente } = await supabase
           .from('download_links')
           .select('id')
@@ -214,8 +213,6 @@ async function runImportPipeline() {
             status: 'active',
           });
         }
-
-        console.log(`✅ Registro atualizado com sucesso no Supabase.`);
       } else {
         const { data: novoPost, error: errPost } = await supabase
           .from('posts')
@@ -226,6 +223,7 @@ async function runImportPipeline() {
             content,
             cover_url: coverUrl,
             developer,
+            category_id: categoryId,
             status: 'published',
             published_at: new Date().toISOString(),
           })
@@ -239,7 +237,7 @@ async function runImportPipeline() {
 
         postId = novoPost.id;
 
-        const { error: errLink } = await supabase.from('download_links').insert({
+        await supabase.from('download_links').insert({
           post_id: postId,
           version: item.sourceGroup,
           original_url: downloadUrl,
@@ -248,26 +246,15 @@ async function runImportPipeline() {
           status: 'active',
         });
 
-        if (errLink) {
-          console.error(`[ERROR] Falha ao salvar link de download:`, errLink?.message || errLink);
-        } else {
-          console.log(`✅ Novo registro inserido no Supabase com sucesso (ID: ${postId})`);
-        }
-
-        // Notifica o Telegram apenas para novos posts inseridos
+        console.log(`✅ Novo registro inserido no Supabase (ID: ${postId})`);
         await notificarTelegram(title, item.slug, publicUrl, item.sourceGroup);
       }
     } else {
-      console.log(`ℹ️ [DRY RUN] Item processado com sucesso:`);
-      console.log(`   - Título: ${title}`);
-      console.log(`   - Capa Captação: ${coverUrl}`);
-      console.log(`   - Link: ${publicUrl}`);
+      console.log(`ℹ️ [DRY RUN] Item processado: ${title}`);
     }
-
-    await sleep(1000);
   }
 
-  console.log('\n🎉 Esteira de automação concluída com sucesso!');
+  console.log('\n🎉 Esteira de automação massiva concluída com sucesso!');
 }
 
 runImportPipeline().catch((err) => {

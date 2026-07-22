@@ -94,10 +94,11 @@ DROP POLICY IF EXISTS "Inserção de publicações telegram" ON telegram_publica
 CREATE POLICY "Inserção de publicações telegram" ON telegram_publications
   FOR INSERT WITH CHECK (true);
 
--- Inserções Iniciais de Teste (Categorias Padrão)
+-- Inserções Iniciais de Categorias Padrão
 INSERT INTO categories (name, slug) VALUES
-  ('Softwares Libres', 'softwares-livres'),
-  ('Jogos Indiegames', 'jogos-indie'),
+  ('Softwares Livres', 'softwares-livres'),
+  ('Jogos Repacks', 'jogos-repacks'),
+  ('Jogos Indie', 'jogos-indie'),
   ('Utilitários & Ferramentas', 'utilitarios'),
   ('Mídias Autorizadas', 'midias-autorizadas')
 ON CONFLICT (slug) DO NOTHING;
