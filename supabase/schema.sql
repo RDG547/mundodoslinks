@@ -77,6 +77,23 @@ DROP POLICY IF EXISTS "Leitura pública de links de download ativos" ON download
 CREATE POLICY "Leitura pública de links de download ativos" ON download_links
   FOR SELECT USING (status = 'active');
 
+-- Políticas de Inserção e Atualização para Automação / API
+DROP POLICY IF EXISTS "Inserção de posts" ON posts;
+CREATE POLICY "Inserção de posts" ON posts
+  FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Atualização de posts" ON posts;
+CREATE POLICY "Atualização de posts" ON posts
+  FOR UPDATE USING (true);
+
+DROP POLICY IF EXISTS "Inserção de links de download" ON download_links;
+CREATE POLICY "Inserção de links de download" ON download_links
+  FOR INSERT WITH CHECK (true);
+
+DROP POLICY IF EXISTS "Inserção de publicações telegram" ON telegram_publications;
+CREATE POLICY "Inserção de publicações telegram" ON telegram_publications
+  FOR INSERT WITH CHECK (true);
+
 -- Inserções Iniciais de Teste (Categorias Padrão)
 INSERT INTO categories (name, slug) VALUES
   ('Softwares Libres', 'softwares-livres'),
